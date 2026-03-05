@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Influence Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropbox.js/10.34.0/Dropbox-sdk.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --note:#41C9A0; --note-light:#e6faf5; --note-dark:#2eaf88;
+  --x:#1DA1F2;    --x-light:#e8f5fd;    --x-dark:#0d8fd8;
+  --bg:#f8fafc; --white:#fff; --border:#e2e8f0;
+  --text:#1e293b; --muted:#94a3b8; --sm:#64748b;
+  --shadow:0 2px 12px rgba(0,0,0,.07); --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP','Hiragino Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── screens ── */
+.screen{display:none}
+
+/* ══ SETUP SCREEN ══ */
+#setup-screen{min-height:100vh;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#f0fdf9 0%,#eff6ff 100%)}
+#setup-screen.on{display:flex}
+.setup-wrap{width:100%;max-width:520px}
+.setup-card{background:var(--white);border-radius:22px;box-shadow:0 8px 40px rgba(0,0,0,.10);padding:36px 38px}
+.setup-logo{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.setup-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--note),var(--x));display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700}
+.setup-logo h1{font-size:18px;font-weight:700}
+.setup-card h2{font-size:17px;font-weight:700;margin-bottom:6px}
+.setup-desc{color:var(--sm);font-size:13px;line-height:1.7;margin-bottom:20px}
+.steps{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
+.step{display:flex;gap:11px;align-items:flex-start}
+.step-num{width:22px;height:22px;border-radius:50%;background:#0061fe;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body{font-size:13px;line-height:1.6;color:var(--text)}
+.step-body a{color:#0061fe}
+.step-body code{font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px;word-break:break-all}
+.setup-field label{font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:5px}
+.setup-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s;background:#f8fafc}
+.setup-input:focus{border-color:#0061fe;background:#fff}
+.setup-btns{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.btn-primary{background:#0061fe;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn-primary:hover{background:#0050d0}
+.btn-skip{background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-skip:hover{border-color:var(--sm);color:var(--sm)}
+#setup-err{color:#dc2626;font-size:12px;margin-top:8px;min-height:16px}
+
+/* ══ APP SCREEN ══ */
+#app-screen{flex-direction:column;min-height:100vh}
+#app-screen.on{display:flex}
+
+header{background:var(--white);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,.05)}
+.header-inner{max-width:1100px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--note),var(--x));display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700}
+.logo h1{font-size:16px;font-weight:700}
+.tab-switcher{display:flex;gap:3px;background:#f1f5f9;border-radius:11px;padding:3px}
+.tab-btn{display:flex;align-items:center;gap:5px;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;color:var(--sm);background:transparent;font-family:inherit}
+.tab-btn.active{background:var(--white);box-shadow:var(--shadow)}
+.tab-btn.note.active{color:var(--note)}.tab-btn.x.active{color:var(--x)}
+
+/* sync bar */
+#sync-bar{background:var(--white);border-bottom:1px solid var(--border)}
+.sync-inner{max-width:1100px;margin:0 auto;padding:6px 20px;display:flex;align-items:center;gap:10px;font-size:12px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:#22c55e}.dot-warn{background:#f59e0b}.dot-err{background:#ef4444}
+.dot-spin{background:#94a3b8;animation:blink 1s linear infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#sync-msg{color:var(--sm)}
+.sync-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.bts{font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:all .15s}
+.bts-ghost{background:#f1f5f9;color:var(--sm)}.bts-ghost:hover{background:#e2e8f0}
+.bts-red{background:#fee2e2;color:#dc2626}.bts-red:hover{background:#fecaca}
+.bts-blue{background:#eff6ff;color:#2563eb}.bts-blue:hover{background:#dbeafe}
+
+main{max-width:1100px;margin:0 auto;padding:20px;flex:1}
+.layout{display:flex;gap:18px}
+.sidebar{width:255px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.sidebar-hd{display:flex;align-items:center;justify-content:space-between}
+.sidebar-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--sm)}
+.item-list{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 300px);overflow-y:auto}
+.item-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:11px;cursor:pointer;transition:all .15s;text-align:left;width:100%;font-family:inherit}
+.item-card:hover{border-color:var(--note)}
+.item-card.active-note{background:var(--note-light);border-color:var(--note);box-shadow:var(--shadow)}
+.item-card.active-x{background:var(--x-light);border-color:var(--x);box-shadow:var(--shadow)}
+.item-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.4}
+.item-date{font-size:11px;color:var(--muted);margin-top:3px}
+.item-stats{display:flex;gap:7px;margin-top:3px}
+.item-stat{font-size:11px;color:var(--sm)}
+.content{flex:1;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:var(--sm)}
+.stat-grid{display:grid;gap:10px}
+.sg2{grid-template-columns:repeat(2,1fr)}.sg3{grid-template-columns:repeat(3,1fr)}
+.stat-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:13px 15px;border-left:4px solid var(--border)}
+.stat-card.note{border-left-color:var(--note)}.stat-card.x{border-left-color:var(--x)}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px}
+.stat-value{font-size:22px;font-weight:700;color:var(--text)}
+.chart-wrap{position:relative;height:195px}.chart-sm{position:relative;height:150px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;color:var(--muted);font-weight:600;text-align:right;padding-bottom:7px;border-bottom:1px solid #f1f5f9}
+th:first-child{text-align:left}
+td{padding:7px 0;border-bottom:1px solid #f8fafc;text-align:right;color:var(--sm)}
+td:first-child{text-align:left}
+.td-b{font-weight:600;color:var(--text)}.td-n{font-weight:600;color:var(--note)}.td-x{font-weight:600;color:var(--x)}
+.form-panel{background:var(--white);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);border:1.5px solid var(--border);display:flex;flex-direction:column;gap:9px}
+.form-panel.nb{border-color:var(--note)}.form-panel.xb{border-color:var(--x)}
+.form-title{font-size:13px;font-weight:700;color:var(--sm)}
+.fg{display:grid;gap:8px}.fg2{grid-template-columns:repeat(2,1fr)}.fg3{grid-template-columns:repeat(3,1fr)}.fg4{grid-template-columns:repeat(4,1fr)}
+.fr{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+input,textarea{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#f8fafc;transition:border-color .15s;outline:none}
+input:focus,textarea:focus{border-color:var(--note);background:#fff}
+textarea{resize:vertical}
+.fa{display:flex;gap:6px}
+.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block}
+.badge-rose{background:#fde8e8;color:#dc2626}.badge-green{background:#d1fae5;color:#059669}
+.badge-blue{background:#dbeafe;color:#2563eb}.badge-amber{background:#fef3c7;color:#d97706}
+.post-card{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;border-left:4px solid var(--x)}
+.post-text{font-size:15px;line-height:1.7;color:var(--text)}.post-meta{font-size:12px;color:var(--muted);margin-top:8px}
+.btn{border:none;cursor:pointer;font-family:inherit;border-radius:8px;font-weight:600;transition:all .15s}
+.btn-note{background:var(--note);color:#fff}.btn-note:hover{background:var(--note-dark)}
+.btn-x{background:var(--x);color:#fff}.btn-x:hover{background:var(--x-dark)}
+.btn-ghost{background:#f1f5f9;color:var(--sm)}.btn-ghost:hover{background:#e2e8f0}
+.btn-sm{font-size:12px;padding:5px 10px}
+.hidden{display:none!important}
+.tab-content{display:none}.tab-content.active{display:block}
+.empty{display:flex;align-items:center;justify-content:center;height:110px;color:var(--muted);font-size:14px}
+@media(max-width:700px){
+  .layout{flex-direction:column}.sidebar{width:100%}.item-list{max-height:200px}
+  .fg3,.fg4{grid-template-columns:repeat(2,1fr)}.sg3{grid-template-columns:repeat(2,1fr)}
+  .setup-card{padding:24px 20px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ SETUP SCREEN ══════════ -->
+<div id="setup-screen" class="screen">
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="setup-logo">
+        <div class="setup-icon">IN</div>
+        <h1>Influence Tracker</h1>
+      </div>
+      <h2>Dropboxと連携して同期する</h2>
+      <p class="setup-desc">PC・iPhone・iPadでデータを自動同期できます。<br>Dropboxなしでもこのデバイスだけで使えます。</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><a href="https://www.dropbox.com/developers/apps" target="_blank">Dropbox App Console</a> →「Create app」→「Scoped access」→「Full Dropbox」で作成</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body">Settings タブの <strong>App key</strong> をコピー</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body">Settings → OAuth 2 → Redirect URIs に以下のURLを追加：<br><code id="uri-hint" style="font-size:11px"></code></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body">Permissions タブで <strong>files.content.read</strong> と <strong>files.content.write</strong> にチェック → Submit</div></div>
+      </div>
+      <div class="setup-field">
+        <label>App key</label>
+        <input type="text" id="setup-appkey" class="setup-input" placeholder="xxxxxxxxxxxxxxx" />
+      </div>
+      <div id="setup-err"></div>
+      <div class="setup-btns">
+        <button class="btn-primary" onclick="startAuth()">🔗 Dropboxで認証して始める</button>
+        <button class="btn-skip" onclick="startLocal()">Dropboxなしで使う（このデバイスのみ保存）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APP SCREEN ══════════ -->
+<div id="app-screen" class="screen">
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">IN</div>
+        <h1>Influence Tracker</h1>
+      </div>
+      <div class="tab-switcher">
+        <button class="tab-btn note active" onclick="switchTab('note')">📝 note</button>
+        <button class="tab-btn x" onclick="switchTab('x')">𝕏 X</button>
+      </div>
+    </div>
+  </header>
+  <div id="sync-bar">
+    <div class="sync-inner">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="dot dot-spin" id="sync-dot"></div>
+        <span id="sync-msg">起動中...</span>
+      </div>
+      <div class="sync-actions" id="sync-actions"></div>
+    </div>
+  </div>
+
+  <main>
+    <!-- NOTE TAB -->
+    <div id="tab-note" class="tab-content active">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-hd">
+            <span class="sidebar-title">記事一覧</span>
+            <button class="btn btn-note btn-sm" onclick="toggleForm('n-add-art')">＋追加</button>
+          </div>
+          <div id="n-add-art" class="form-panel nb hidden">
+            <p class="form-title">新しい記事</p>
+            <div><label>記事タイトル</label><input type="text" id="n-new-title" placeholder="タイトル..." /></div>
+            <div><label>投稿日</label><input type="date" id="n-new-date" /></div>
+            <div class="fa">
+              <button class="btn btn-note btn-sm" style="flex:1" onclick="addNoteArticle()">追加</button>
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="toggleForm('n-add-art')">キャンセル</button>
+            </div>
+          </div>
+          <div class="item-list" id="note-list"></div>
+        </div>
+        <div class="content">
+          <div class="empty" id="n-empty">記事を選択してください</div>
+          <div id="n-detail" class="hidden">
+            <div style="margin-bottom:4px">
+              <div id="n-title" style="font-size:19px;font-weight:700;line-height:1.3"></div>
+              <div id="n-pub" style="font-size:12px;color:var(--muted);margin-top:3px"></div>
+            </div>
+            <div class="stat-grid sg2">
+              <div class="stat-card note"><div class="stat-label">最新ビュー</div><div class="stat-value" id="n-sv">—</div></div>
+              <div class="stat-card note"><div class="stat-label">最新スキ</div><div class="stat-value" id="n-sl">—</div></div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">インプレッション推移</span><button class="btn btn-note btn-sm" onclick="toggleForm('n-add-obs')">＋観測追加</button></div>
+              <div id="n-add-obs" class="form-panel nb hidden" style="margin-bottom:14px">
+                <p class="form-title">観測データを追加</p>
+                <div class="fg fg3">
+                  <div><label>観測日</label><input type="date" id="n-od" /></div>
+                  <div><label>ビュー数</label><input type="number" id="n-ov" placeholder="1200" /></div>
+                  <div><label>スキ数</label><input type="number" id="n-ol" placeholder="85" /></div>
+                </div>
+                <div class="fa">
+                  <button class="btn btn-note btn-sm" onclick="addNoteObs()">追加</button>
+                  <button class="btn btn-ghost btn-sm" onclick="toggleForm('n-add-obs')">キャンセル</button>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="note-chart"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">観測ログ</span></div>
+              <table><thead><tr><th>観測日</th><th>ビュー</th><th>スキ</th><th>エンゲージ率</th></tr></thead><tbody id="n-log"></tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hd"><span class="card-title">総合フォロワー推移</span><button class="btn btn-ghost btn-sm" onclick="toggleForm('n-add-ov')">＋追加</button></div>
+            <div id="n-add-ov" class="form-panel hidden" style="margin-bottom:14px">
+              <div class="fr">
+                <div><label>月 (YYYY-MM)</label><input type="text" id="n-ovd" placeholder="2025-02" style="width:110px" /></div>
+                <div><label>フォロワー数</label><input type="number" id="n-ovf" placeholder="800" style="width:100px" /></div>
+                <button class="btn btn-note btn-sm" onclick="addNoteOverall()">追加</button>
+                <button class="btn btn-ghost btn-sm" onclick="toggleForm('n-add-ov')">×</button>
+              </div>
+            </div>
+            <div class="chart-sm"><canvas id="note-ov-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- X TAB -->
+    <div id="tab-x" class="tab-content">
+      <div class="layout">
+        <div class="sidebar" style="width:268px">
+          <div class="sidebar-hd">
+            <span class="sidebar-title">ポスト一覧</span>
+            <button class="btn btn-x btn-sm" onclick="toggleForm('x-add-post')">＋追加</button>
+          </div>
+          <div id="x-add-post" class="form-panel xb hidden">
+            <p class="form-title">新しいポスト</p>
+            <div><label>ポスト本文</label><textarea id="x-nc" rows="4" placeholder="ポスト本文を貼り付け..."></textarea></div>
+            <div><label>投稿日</label><input type="date" id="x-nd" /></div>
+            <div class="fa">
+              <button class="btn btn-x btn-sm" style="flex:1" onclick="addXPost()">追加</button>
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="toggleForm('x-add-post')">キャンセル</button>
+            </div>
+          </div>
+          <div class="item-list" id="x-list"></div>
+        </div>
+        <div class="content">
+          <div class="empty" id="x-empty">ポストを選択してください</div>
+          <div id="x-detail" class="hidden">
+            <div class="post-card">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+                <div id="x-pt" class="post-text"></div><div id="x-badge"></div>
+              </div>
+              <div id="x-pd" class="post-meta"></div>
+            </div>
+            <div class="stat-grid sg3">
+              <div class="stat-card x"><div class="stat-label">最新インプ</div><div class="stat-value" id="x-si">—</div></div>
+              <div class="stat-card x"><div class="stat-label">最新いいね</div><div class="stat-value" id="x-sl">—</div></div>
+              <div class="stat-card x"><div class="stat-label">最新リポスト</div><div class="stat-value" id="x-sr">—</div></div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">インプレッション推移</span><button class="btn btn-x btn-sm" onclick="toggleForm('x-add-obs')">＋観測追加</button></div>
+              <div id="x-add-obs" class="form-panel xb hidden" style="margin-bottom:14px">
+                <p class="form-title">観測データを追加</p>
+                <div class="fg fg4">
+                  <div><label>観測日</label><input type="date" id="x-od" /></div>
+                  <div><label>インプレッション</label><input type="number" id="x-oi" placeholder="3000" /></div>
+                  <div><label>いいね</label><input type="number" id="x-ol" placeholder="120" /></div>
+                  <div><label>リポスト</label><input type="number" id="x-or" placeholder="25" /></div>
+                </div>
+                <div class="fa">
+                  <button class="btn btn-x btn-sm" onclick="addXObs()">追加</button>
+                  <button class="btn btn-ghost btn-sm" onclick="toggleForm('x-add-obs')">キャンセル</button>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="x-chart"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">観測ログ</span></div>
+              <table><thead><tr><th>観測日</th><th>インプ</th><th>いいね</th><th>リポスト</th><th>エンゲージ率</th></tr></thead><tbody id="x-log"></tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hd"><span class="card-title">総合フォロワー推移</span><button class="btn btn-ghost btn-sm" onclick="toggleForm('x-add-ov')">＋追加</button></div>
+            <div id="x-add-ov" class="form-panel hidden" style="margin-bottom:14px">
+              <div class="fr">
+                <div><label>月 (YYYY-MM)</label><input type="text" id="x-ovd" placeholder="2025-02" style="width:110px" /></div>
+                <div><label>フォロワー数</label><input type="number" id="x-ovf" placeholder="2500" style="width:110px" /></div>
+                <button class="btn btn-x btn-sm" onclick="addXOverall()">追加</button>
+                <button class="btn btn-ghost btn-sm" onclick="toggleForm('x-add-ov')">×</button>
+              </div>
+            </div>
+            <div class="chart-sm"><canvas id="x-ov-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ════════════════ CONSTANTS ════════════════
+const LS={appkey:'it_appkey',refresh:'it_refresh',verifier:'it_verifier',mode:'it_mode',local:'it_local'};
+const DBX_PATH='/influence-tracker-data.json';
+
+// ════════════════ DEFAULT DATA ════════════════
+const DEFAULTS={
+  noteArticles:[
+    {id:'n1',title:'AIと働く未来：私の実験記録',publishedAt:'2024-11-01',observations:[
+      {date:'2024-11-05',views:320,likes:42},{date:'2024-11-15',views:810,likes:98},
+      {date:'2024-12-01',views:1340,likes:145},{date:'2025-01-10',views:1820,likes:178}]},
+    {id:'n2',title:'毎朝5時に起きて変わったこと',publishedAt:'2024-12-10',observations:[
+      {date:'2024-12-12',views:540,likes:67},{date:'2024-12-25',views:1200,likes:134},
+      {date:'2025-01-10',views:1590,likes:162}]},
+  ],
+  noteOverall:[{date:'2024-11',followers:320},{date:'2024-12',followers:490},{date:'2025-01',followers:670}],
+  selectedNote:'n1',
+  xPosts:[
+    {id:'x1',content:'AIに「今日のTo-Doリスト作って」って頼んだら、めちゃくちゃ的確で逆に怖かった😂 もう秘書いらない説',postedAt:'2025-01-05',observations:[
+      {date:'2025-01-05',impressions:2400,likes:187,reposts:34},{date:'2025-01-08',impressions:5800,likes:421,reposts:89},
+      {date:'2025-01-15',impressions:6200,likes:445,reposts:92}]},
+    {id:'x2',content:'「副業で月5万」より「本業で月5万上げる」方が実はコスパ良いんじゃないかって最近思う。時間効率が全然違う。',postedAt:'2025-01-12',observations:[
+      {date:'2025-01-12',impressions:1100,likes:89,reposts:15},{date:'2025-01-14',impressions:3200,likes:245,reposts:48}]},
+  ],
+  xOverall:[{date:'2024-11',followers:1200},{date:'2024-12',followers:1580},{date:'2025-01',followers:2140}],
+  selectedX:'x1',
+};
+
+// ════════════════ STATE ════════════════
+let S=JSON.parse(JSON.stringify(DEFAULTS));
+let dbxAuth=null,dbx=null,saveTimer=null,syncMode=null;
+
+// ════════════════ SCREEN ════════════════
+function showScreen(id){
+  ['setup-screen','app-screen'].forEach(s=>{
+    const el=document.getElementById(s);
+    el.classList.toggle('on',el.id===id);
+  });
+}
+
+// ════════════════ SYNC BAR ════════════════
+function setSyncStatus(dc,msg){
+  document.getElementById('sync-dot').className='dot '+dc;
+  document.getElementById('sync-msg').textContent=msg;
+}
+function buildSyncActions(){
+  const el=document.getElementById('sync-actions');
+  if(syncMode==='dropbox'){
+    el.innerHTML=`<button class="bts bts-ghost" onclick="loadFromDropbox(true)">🔄 再読み込み</button>
+      <button class="bts bts-blue" onclick="goSetup()">⚙ Dropbox設定</button>
+      <button class="bts bts-red" onclick="disconnectDropbox()">切断</button>`;
+  }else{
+    el.innerHTML=`<button class="bts bts-blue" onclick="goSetup()">🔗 Dropboxと連携する</button>`;
+  }
+}
+function goSetup(){
+  const s=localStorage.getItem(LS.appkey);
+  if(s) document.getElementById('setup-appkey').value=s;
+  showScreen('setup-screen');
+}
+function disconnectDropbox(){
+  if(!confirm('Dropboxとの連携を解除しますか？\nデータはDropboxに残ります。')) return;
+  [LS.appkey,LS.refresh,LS.verifier].forEach(k=>localStorage.removeItem(k));
+  localStorage.setItem(LS.mode,'local');
+  syncMode='local'; dbx=null; dbxAuth=null;
+  buildSyncActions();
+  setSyncStatus('dot-warn','ローカル保存モード（Dropbox未連携）');
+}
+
+// ════════════════ DROPBOX AUTH ════════════════
+function currentUrl(){return location.href.split('?')[0].split('#')[0];}
+
+async function startAuth(){
+  const appKey=document.getElementById('setup-appkey').value.trim();
+  if(!appKey){document.getElementById('setup-err').textContent='App key を入力してください';return;}
+  localStorage.setItem(LS.appkey,appKey);
+  dbxAuth=new Dropbox.DropboxAuth({clientId:appKey});
+  const url=await dbxAuth.getAuthenticationUrl(currentUrl(),undefined,'code','offline',undefined,undefined,true);
+  localStorage.setItem(LS.verifier,dbxAuth.codeVerifier);
+  window.location.href=url;
+}
+
+async function handleCallback(){
+  const params=new URLSearchParams(location.search);
+  const code=params.get('code');
+  if(!code) return false;
+  history.replaceState({},document.title,location.pathname);
+  const appKey=localStorage.getItem(LS.appkey),verifier=localStorage.getItem(LS.verifier);
+  if(!appKey||!verifier) return false;
+  dbxAuth=new Dropbox.DropboxAuth({clientId:appKey});
+  dbxAuth.codeVerifier=verifier;
+  try{
+    const res=await dbxAuth.getAccessTokenFromCode(currentUrl(),code);
+    localStorage.setItem(LS.refresh,res.result.refresh_token);
+    localStorage.setItem(LS.mode,'dropbox');
+    localStorage.removeItem(LS.verifier);
+    return true;
+  }catch(e){
+    document.getElementById('setup-err').textContent='認証失敗: '+(e.message||e);
+    return false;
+  }
+}
+
+async function initDbx(){
+  const appKey=localStorage.getItem(LS.appkey),refresh=localStorage.getItem(LS.refresh);
+  if(!appKey||!refresh) return false;
+  dbxAuth=new Dropbox.DropboxAuth({clientId:appKey});
+  dbxAuth.setRefreshToken(refresh);
+  dbx=new Dropbox.Dropbox({auth:dbxAuth});
+  return true;
+}
+
+// ════════════════ PERSISTENCE ════════════════
+async function loadFromDropbox(manual=false){
+  setSyncStatus('dot-spin','読み込み中...');
+  try{
+    const resp=await dbx.filesDownload({path:DBX_PATH});
+    const text=await resp.result.fileBlob.text();
+    const loaded=JSON.parse(text);
+    S={...JSON.parse(JSON.stringify(DEFAULTS)),...loaded};
+    if(!S.selectedNote&&S.noteArticles.length) S.selectedNote=S.noteArticles[0].id;
+    if(!S.selectedX&&S.xPosts.length) S.selectedX=S.xPosts[0].id;
+    setSyncStatus('dot-ok','Dropboxと同期済み ✓');
+    renderAll();
+    if(manual) toast('✅ Dropboxから読み込みました');
+  }catch(e){
+    if(e?.status===409){
+      S=JSON.parse(JSON.stringify(DEFAULTS));
+      await saveData(); renderAll();
+    }else{
+      setSyncStatus('dot-err','読み込みエラー — '+(e?.error?.error_summary||e?.message||'不明'));
+    }
+  }
+}
+
+async function saveToDropbox(){
+  setSyncStatus('dot-spin','保存中...');
+  try{
+    const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+    await dbx.filesUpload({path:DBX_PATH,contents:blob,mode:{'.tag':'overwrite'}});
+    setSyncStatus('dot-ok','Dropboxに保存 ✓ ('+new Date().toLocaleTimeString('ja-JP')+')');
+  }catch(e){
+    setSyncStatus('dot-err','保存エラー — '+(e?.error?.error_summary||e?.message||'不明'));
+  }
+}
+
+function saveLocal(){
+  localStorage.setItem(LS.local,JSON.stringify(S));
+  setSyncStatus('dot-warn','ローカルに保存 ('+new Date().toLocaleTimeString('ja-JP')+')  ※Dropbox未連携');
+}
+
+async function saveData(){syncMode==='dropbox'?await saveToDropbox():saveLocal();}
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  setSyncStatus('dot-warn','変更あり — 保存待ち...');
+  saveTimer=setTimeout(()=>saveData(),1500);
+}
+
+// ════════════════ LOCAL MODE ════════════════
+function startLocal(){
+  localStorage.setItem(LS.mode,'local');
+  syncMode='local';
+  try{const d=localStorage.getItem(LS.local);if(d) S={...JSON.parse(JSON.stringify(DEFAULTS)),...JSON.parse(d)};}catch(e){}
+  if(!S.selectedNote&&S.noteArticles.length) S.selectedNote=S.noteArticles[0].id;
+  if(!S.selectedX&&S.xPosts.length) S.selectedX=S.xPosts[0].id;
+  buildSyncActions();
+  setSyncStatus('dot-warn','ローカル保存モード（Dropbox未連携）');
+  showScreen('app-screen');
+  renderAll();
+}
+
+// ════════════════ UI HELPERS ════════════════
+let charts={};
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function fmt(n){if(n==null||n==='') return '—'; return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
+function uid(){return Math.random().toString(36).slice(2,9);}
+function latest(obs){return obs.length?obs[obs.length-1]:null;}
+function scoreLabel(imp){
+  if(!imp) return null;
+  if(imp>=5000) return{l:'🔥 バズり',c:'badge-rose'};
+  if(imp>=2000) return{l:'✨ 好調',c:'badge-green'};
+  if(imp>=500)  return{l:'📈 普通',c:'badge-blue'};
+  return{l:'💤 低調',c:'badge-amber'};
+}
+const CD={
+  plugins:{legend:{labels:{font:{family:"'Noto Sans JP',sans-serif",size:11},boxWidth:12}}},
+  scales:{x:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}}}}
+};
+function switchTab(t){
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  document.querySelector('.tab-btn.'+t).classList.add('active');
+  t==='note'?renderNote():renderX();
+}
+function toggleForm(id){document.getElementById(id).classList.toggle('hidden');}
+function toast(msg){
+  const t=document.createElement('div');t.textContent=msg;
+  Object.assign(t.style,{position:'fixed',bottom:'22px',right:'22px',background:'#1e293b',color:'#fff',padding:'10px 18px',borderRadius:'10px',fontSize:'13px',fontWeight:'600',zIndex:'9999',opacity:'0',transition:'opacity .3s',pointerEvents:'none'});
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.style.opacity='1');
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},2500);
+}
+
+// ════════════════ RENDER — NOTE ════════════════
+function renderNoteList(){
+  const el=document.getElementById('note-list');el.innerHTML='';
+  S.noteArticles.forEach(a=>{
+    const obs=latest(a.observations);
+    const btn=document.createElement('button');
+    btn.className='item-card'+(S.selectedNote===a.id?' active-note':'');
+    btn.innerHTML=`<div class="item-title">${a.title}</div><div class="item-date">${a.publishedAt}</div>`
+      +(obs?`<div class="item-stats"><span class="item-stat">👁 ${fmt(obs.views)}</span><span class="item-stat">💚 ${fmt(obs.likes)}</span></div>`:'');
+    btn.onclick=()=>{S.selectedNote=a.id;renderNote();};
+    el.appendChild(btn);
+  });
+}
+function renderNoteDetail(){
+  const a=S.noteArticles.find(x=>x.id===S.selectedNote);
+  const empty=document.getElementById('n-empty'),detail=document.getElementById('n-detail');
+  if(!a){empty.classList.remove('hidden');detail.classList.add('hidden');return;}
+  empty.classList.add('hidden');detail.classList.remove('hidden');
+  document.getElementById('n-title').textContent=a.title;
+  document.getElementById('n-pub').textContent='投稿日: '+a.publishedAt;
+  const obs=latest(a.observations);
+  document.getElementById('n-sv').textContent=fmt(obs?.views);
+  document.getElementById('n-sl').textContent=fmt(obs?.likes);
+  destroyChart('nc');
+  charts['nc']=new Chart(document.getElementById('note-chart').getContext('2d'),{type:'line',data:{
+    labels:a.observations.map(o=>o.date.slice(5)),
+    datasets:[
+      {label:'ビュー',data:a.observations.map(o=>o.views),borderColor:'#41C9A0',backgroundColor:'rgba(65,201,160,.12)',fill:true,tension:.4,pointRadius:5,pointBackgroundColor:'#41C9A0'},
+      {label:'スキ',data:a.observations.map(o=>o.likes),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',fill:true,tension:.4,pointRadius:5,pointBackgroundColor:'#6366f1'},
+    ]},options:{...CD,responsive:true,maintainAspectRatio:false}});
+  document.getElementById('n-log').innerHTML=[...a.observations].reverse().map(o=>`
+    <tr><td>${o.date}</td><td class="td-b">${fmt(o.views)}</td><td class="td-n">${fmt(o.likes)}</td>
+    <td>${o.views?((o.likes/o.views)*100).toFixed(1)+'%':'—'}</td></tr>`).join('');
+}
+function renderNoteOverall(){
+  destroyChart('no');
+  charts['no']=new Chart(document.getElementById('note-ov-chart').getContext('2d'),{type:'line',data:{
+    labels:S.noteOverall.map(o=>o.date),
+    datasets:[{label:'フォロワー',data:S.noteOverall.map(o=>o.followers),borderColor:'#41C9A0',backgroundColor:'rgba(65,201,160,.1)',fill:true,tension:.4,pointRadius:6,pointBackgroundColor:'#41C9A0'}]
+  },options:{...CD,responsive:true,maintainAspectRatio:false}});
+}
+function renderNote(){renderNoteList();renderNoteDetail();renderNoteOverall();}
+
+// ════════════════ RENDER — X ════════════════
+function renderXList(){
+  const el=document.getElementById('x-list');el.innerHTML='';
+  S.xPosts.forEach(p=>{
+    const obs=latest(p.observations),sl=obs?scoreLabel(obs.impressions):null;
+    const btn=document.createElement('button');
+    btn.className='item-card'+(S.selectedX===p.id?' active-x':'');
+    btn.innerHTML=`<div class="item-title" style="font-weight:400;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${p.content}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px">
+        <span class="item-date">${p.postedAt}</span>${sl?`<span class="badge ${sl.c}">${sl.l}</span>`:''}
+      </div>`+(obs?`<div class="item-stats"><span class="item-stat">👁 ${fmt(obs.impressions)}</span><span class="item-stat">♥ ${fmt(obs.likes)}</span><span class="item-stat">🔁 ${fmt(obs.reposts)}</span></div>`:'');
+    btn.onclick=()=>{S.selectedX=p.id;renderX();};
+    el.appendChild(btn);
+  });
+}
+function renderXDetail(){
+  const p=S.xPosts.find(x=>x.id===S.selectedX);
+  const empty=document.getElementById('x-empty'),detail=document.getElementById('x-detail');
+  if(!p){empty.classList.remove('hidden');detail.classList.add('hidden');return;}
+  empty.classList.add('hidden');detail.classList.remove('hidden');
+  document.getElementById('x-pt').textContent=p.content;
+  document.getElementById('x-pd').textContent='投稿日: '+p.postedAt;
+  const obs=latest(p.observations);
+  document.getElementById('x-si').textContent=fmt(obs?.impressions);
+  document.getElementById('x-sl').textContent=fmt(obs?.likes);
+  document.getElementById('x-sr').textContent=fmt(obs?.reposts);
+  const sl=obs?scoreLabel(obs.impressions):null;
+  document.getElementById('x-badge').innerHTML=sl?`<span class="badge ${sl.c}" style="white-space:nowrap">${sl.l}</span>`:'';
+  destroyChart('xc');
+  charts['xc']=new Chart(document.getElementById('x-chart').getContext('2d'),{type:'line',data:{
+    labels:p.observations.map(o=>o.date.slice(5)),
+    datasets:[
+      {label:'インプレッション',data:p.observations.map(o=>o.impressions),borderColor:'#1DA1F2',backgroundColor:'rgba(29,161,242,.1)',fill:true,tension:.4,pointRadius:5,pointBackgroundColor:'#1DA1F2'},
+      {label:'いいね',data:p.observations.map(o=>o.likes),borderColor:'#f59e0b',backgroundColor:'transparent',tension:.4,pointRadius:5,pointBackgroundColor:'#f59e0b'},
+      {label:'リポスト',data:p.observations.map(o=>o.reposts),borderColor:'#10b981',backgroundColor:'transparent',tension:.4,pointRadius:5,pointBackgroundColor:'#10b981'},
+    ]},options:{...CD,responsive:true,maintainAspectRatio:false}});
+  document.getElementById('x-log').innerHTML=[...p.observations].reverse().map(o=>`
+    <tr><td>${o.date}</td><td class="td-b">${fmt(o.impressions)}</td><td class="td-x">${fmt(o.likes)}</td>
+    <td>${fmt(o.reposts)}</td><td>${o.impressions?(((o.likes+o.reposts)/o.impressions)*100).toFixed(1)+'%':'—'}</td></tr>`).join('');
+}
+function renderXOverall(){
+  destroyChart('xo');
+  charts['xo']=new Chart(document.getElementById('x-ov-chart').getContext('2d'),{type:'line',data:{
+    labels:S.xOverall.map(o=>o.date),
+    datasets:[{label:'フォロワー',data:S.xOverall.map(o=>o.followers),borderColor:'#1DA1F2',backgroundColor:'rgba(29,161,242,.1)',fill:true,tension:.4,pointRadius:6,pointBackgroundColor:'#1DA1F2'}]
+  },options:{...CD,responsive:true,maintainAspectRatio:false}});
+}
+function renderX(){renderXList();renderXDetail();renderXOverall();}
+function renderAll(){renderNote();renderX();}
+
+// ════════════════ MUTATIONS ════════════════
+function addNoteArticle(){
+  const title=document.getElementById('n-new-title').value.trim(),date=document.getElementById('n-new-date').value;
+  if(!title||!date){alert('タイトルと投稿日を入力してください');return;}
+  const a={id:uid(),title,publishedAt:date,observations:[]};
+  S.noteArticles.push(a);S.selectedNote=a.id;
+  document.getElementById('n-new-title').value='';document.getElementById('n-new-date').value='';
+  toggleForm('n-add-art');renderNote();scheduleSave();
+}
+function addNoteObs(){
+  const date=document.getElementById('n-od').value,views=parseInt(document.getElementById('n-ov').value)||0,likes=parseInt(document.getElementById('n-ol').value)||0;
+  if(!date||!views){alert('観測日とビュー数を入力してください');return;}
+  const a=S.noteArticles.find(x=>x.id===S.selectedNote);
+  a.observations.push({date,views,likes});a.observations.sort((a,b)=>a.date.localeCompare(b.date));
+  ['n-od','n-ov','n-ol'].forEach(id=>document.getElementById(id).value='');
+  toggleForm('n-add-obs');renderNote();scheduleSave();
+}
+function addNoteOverall(){
+  const date=document.getElementById('n-ovd').value.trim(),followers=parseInt(document.getElementById('n-ovf').value)||0;
+  if(!date||!followers){alert('月とフォロワー数を入力してください');return;}
+  S.noteOverall.push({date,followers});S.noteOverall.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('n-ovd').value='';document.getElementById('n-ovf').value='';
+  toggleForm('n-add-ov');renderNoteOverall();scheduleSave();
+}
+function addXPost(){
+  const content=document.getElementById('x-nc').value.trim(),date=document.getElementById('x-nd').value;
+  if(!content||!date){alert('ポスト本文と投稿日を入力してください');return;}
+  const p={id:uid(),content,postedAt:date,observations:[]};
+  S.xPosts.push(p);S.selectedX=p.id;
+  document.getElementById('x-nc').value='';document.getElementById('x-nd').value='';
+  toggleForm('x-add-post');renderX();scheduleSave();
+}
+function addXObs(){
+  const date=document.getElementById('x-od').value,impressions=parseInt(document.getElementById('x-oi').value)||0;
+  const likes=parseInt(document.getElementById('x-ol').value)||0,reposts=parseInt(document.getElementById('x-or').value)||0;
+  if(!date||!impressions){alert('観測日とインプレッション数を入力してください');return;}
+  const p=S.xPosts.find(x=>x.id===S.selectedX);
+  p.observations.push({date,impressions,likes,reposts});p.observations.sort((a,b)=>a.date.localeCompare(b.date));
+  ['x-od','x-oi','x-ol','x-or'].forEach(id=>document.getElementById(id).value='');
+  toggleForm('x-add-obs');renderX();scheduleSave();
+}
+function addXOverall(){
+  const date=document.getElementById('x-ovd').value.trim(),followers=parseInt(document.getElementById('x-ovf').value)||0;
+  if(!date||!followers){alert('月とフォロワー数を入力してください');return;}
+  S.xOverall.push({date,followers});S.xOverall.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('x-ovd').value='';document.getElementById('x-ovf').value='';
+  toggleForm('x-add-ov');renderXOverall();scheduleSave();
+}
+
+// ════════════════ BOOT ════════════════
+(async function boot(){
+  document.getElementById('uri-hint').textContent=currentUrl();
+
+  const params=new URLSearchParams(location.search);
+
+  // OAuth callback
+  if(params.get('code')){
+    showScreen('app-screen');
+    setSyncStatus('dot-spin','Dropbox認証処理中...');
+    buildSyncActions();
+    const ok=await handleCallback();
+    if(!ok){showScreen('setup-screen');return;}
+    const ready=await initDbx();
+    if(!ready){showScreen('setup-screen');return;}
+    syncMode='dropbox';buildSyncActions();
+    await loadFromDropbox();
+    return;
+  }
+
+  // Already in Dropbox mode
+  const savedMode=localStorage.getItem(LS.mode);
+  if(savedMode==='dropbox'&&localStorage.getItem(LS.refresh)){
+    showScreen('app-screen');
+    setSyncStatus('dot-spin','Dropboxに接続中...');
+    const ready=await initDbx();
+    if(ready){
+      syncMode='dropbox';buildSyncActions();
+      await loadFromDropbox();
+    }else{
+      showScreen('setup-screen');
+    }
+    return;
+  }
+
+  // Already in local mode
+  if(savedMode==='local'){startLocal();return;}
+
+  // First time → setup
+  const s=localStorage.getItem(LS.appkey);
+  if(s) document.getElementById('setup-appkey').value=s;
+  showScreen('setup-screen');
+})();
+</script>
+</body>
+</html>
