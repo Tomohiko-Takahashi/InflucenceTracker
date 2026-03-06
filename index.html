@@ -405,44 +405,54 @@ textarea{resize:vertical}
 
     <!-- REPORT TAB -->
     <div id="tab-report" class="tab-content">
-      <div style="max-width:820px;display:flex;flex-direction:column;gap:16px">
+      <div style="max-width:860px;display:flex;flex-direction:column;gap:16px">
+
+        <!-- 週ナビゲーター -->
+        <div class="card" style="padding:12px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <button class="btn btn-ghost btn-sm" onclick="changeWeek(-1)">← 前の週</button>
+            <div style="text-align:center">
+              <div style="font-size:15px;font-weight:700" id="rpt-week-label">—</div>
+              <div style="font-size:11px;color:var(--muted)" id="rpt-week-range">—</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="rpt-next-btn" onclick="changeWeek(1)">次の週 →</button>
+          </div>
+        </div>
 
         <!-- スコアサマリー -->
         <div class="report-score-grid">
           <div class="score-card">
-            <div class="score-lbl">今週の投稿数</div>
+            <div class="score-lbl">投稿数</div>
             <div class="score-val" id="rpt-post-count">—</div>
             <div class="score-sub" id="rpt-post-sub">目標: <span id="rpt-target-disp">7</span>投稿</div>
           </div>
           <div class="score-card">
             <div class="score-lbl">投稿連続日数</div>
             <div class="score-val" id="rpt-streak">—</div>
-            <div class="score-sub">日連続</div>
+            <div class="score-sub">日連続（当週末時点）</div>
           </div>
           <div class="score-card">
-            <div class="score-lbl">今週のバズり数</div>
+            <div class="score-lbl">バズり数</div>
             <div class="score-val" id="rpt-buzz-count">—</div>
             <div class="score-sub">🔥+🚀 判定</div>
           </div>
         </div>
 
         <div class="report-grid">
-          <!-- 直近7日投稿トラッカー -->
+          <!-- 投稿トラッカー -->
           <div class="card">
-            <div class="card-hd">
-              <span class="card-title">直近7日 投稿トラッカー</span>
-            </div>
+            <div class="card-hd"><span class="card-title">投稿トラッカー（7日）</span></div>
             <div class="week-tracker" id="week-tracker"></div>
             <div class="target-input">
               週の目標投稿数：
-              <input type="number" id="weekly-target" value="7" min="1" max="21" onchange="renderReport()" />
+              <input type="number" id="weekly-target" value="7" min="1" max="21" onchange="renderReport(currentWeekOffset)" />
               投稿
             </div>
           </div>
 
-          <!-- インプ推移（停滞期カラー） -->
+          <!-- インプ推移（選択週） -->
           <div class="card">
-            <div class="card-hd"><span class="card-title">インプ推移（直近30日）</span></div>
+            <div class="card-hd"><span class="card-title">インプ推移（この週）</span></div>
             <div style="position:relative;height:160px"><canvas id="rpt-imp-chart"></canvas></div>
             <div class="imp-legend">
               <div class="imp-legend-item"><div class="imp-legend-dot" style="background:#1DA1F2"></div>通常</div>
@@ -452,13 +462,34 @@ textarea{resize:vertical}
           </div>
         </div>
 
+        <!-- 週比較折れ線グラフ -->
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">📈 週別パフォーマンス比較</span>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sm)">
+              表示週数：
+              <select id="rpt-weeks-count" onchange="renderReport(currentWeekOffset)" style="border:1.5px solid var(--border);border-radius:6px;padding:3px 7px;font-size:12px;font-family:inherit;background:#f8fafc">
+                <option value="4">4週</option>
+                <option value="8" selected>8週</option>
+                <option value="12">12週</option>
+              </select>
+            </div>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="rpt-weekly-chart"></canvas></div>
+          <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+            <div class="imp-legend-item"><div class="imp-legend-dot" style="background:#1DA1F2;border-radius:50%"></div>週平均インプ</div>
+            <div class="imp-legend-item"><div class="imp-legend-dot" style="background:#10b981;border-radius:50%"></div>週投稿数</div>
+            <div class="imp-legend-item"><div class="imp-legend-dot" style="background:#f59e0b;border-radius:50%"></div>バズり数</div>
+          </div>
+        </div>
+
         <!-- AI ウィークリーレポート -->
         <div class="card">
           <div class="card-hd">
             <span class="card-title">🤖 AIウィークリーレポート</span>
             <button class="btn btn-x btn-sm" id="rpt-btn" onclick="generateReport()">レポート生成</button>
           </div>
-          <div class="ai-report-box" id="ai-report">「レポート生成」ボタンを押すと、今週のデータをもとにAIが分析します。</div>
+          <div class="ai-report-box" id="ai-report">「レポート生成」ボタンを押すと、選択中の週のデータをもとにAIが分析します。</div>
         </div>
 
       </div>
@@ -817,52 +848,93 @@ function toast(msg){
 }
 
 // ════════════════ RENDER — REPORT ════════════════
-function renderReport(){
+let currentWeekOffset = 0;
+
+function changeWeek(delta){
+  currentWeekOffset += delta;
+  if(currentWeekOffset > 0) currentWeekOffset = 0;
+  renderReport(currentWeekOffset);
+}
+
+// offset=0:今週, offset=-1:先週, ...
+function getWeekDays(offset){
   const today = new Date();
+  today.setDate(today.getDate() + offset*7);
   const days = [];
   for(let i=6;i>=0;i--){
     const d=new Date(today); d.setDate(today.getDate()-i);
     days.push(d.toISOString().slice(0,10));
   }
+  return days;
+}
 
-  // 投稿日セット
+function getWeekStats(days){
+  const latestFollowers = S.xOverall.length?S.xOverall[S.xOverall.length-1].followers:null;
+  const posts = S.xPosts.filter(p=>days.includes(p.postedAt));
+  const imps = posts.map(p=>latest(p.observations)?.impressions||0).filter(v=>v>0);
+  const avgImp = imps.length ? Math.round(imps.reduce((a,b)=>a+b,0)/imps.length) : 0;
+  let buzz=0;
+  posts.forEach(p=>{
+    const obs=latest(p.observations); if(!obs) return;
+    const er=obs.impressions?(obs.engagements||0)/obs.impressions*100:null;
+    const rr=obs.impressions&&latestFollowers?obs.impressions/latestFollowers*100:null;
+    const sl=scoreLabel(obs.impressions,er,rr,latestFollowers);
+    if(sl&&(sl.l.includes('バズり')||sl.l.includes('好調'))) buzz++;
+  });
+  return {posts:posts.length, avgImp, buzz};
+}
+
+function renderReport(offset=0){
+  currentWeekOffset = offset;
+  const days = getWeekDays(offset);
+  const isCurrentWeek = offset === 0;
+
+  // ナビラベル
+  const weekNum = offset === 0 ? '今週' : `${Math.abs(offset)}週前`;
+  document.getElementById('rpt-week-label').textContent = weekNum;
+  document.getElementById('rpt-week-range').textContent = `${days[0]} 〜 ${days[6]}`;
+  document.getElementById('rpt-next-btn').disabled = isCurrentWeek;
+  document.getElementById('rpt-next-btn').style.opacity = isCurrentWeek ? '0.3' : '1';
+
   const postedDays = new Set(S.xPosts.map(p=>p.postedAt));
 
-  // 7日トラッカー
+  // 投稿トラッカー
   const tracker = document.getElementById('week-tracker');
   const DAY = ['日','月','火','水','木','金','土'];
   tracker.innerHTML = days.map(d=>{
-    const isToday = d===days[6];
+    const isToday = d===new Date().toISOString().slice(0,10);
     const posted  = postedDays.has(d);
-    const cls = posted?'posted':isToday?'today':'miss';
+    const isFuture = d > new Date().toISOString().slice(0,10);
     const count = S.xPosts.filter(p=>p.postedAt===d).length;
-    const wd = DAY[new Date(d).getDay()];
+    const cls = isFuture?'miss':posted?'posted':isToday?'today':'miss';
+    const wd = DAY[new Date(d+'T12:00:00').getDay()];
     return`<div class="day-cell">
-      <div class="day-dot ${cls}">${posted?count:'—'}</div>
+      <div class="day-dot ${cls}" style="${isFuture?'opacity:.3':''}">${posted?count:'—'}</div>
       <div class="day-label">${wd}<br>${d.slice(5)}</div>
     </div>`;
   }).join('');
 
   // スコア集計
+  const latestFollowers = S.xOverall.length?S.xOverall[S.xOverall.length-1].followers:null;
   const weekPosts = S.xPosts.filter(p=>days.includes(p.postedAt));
-  document.getElementById('rpt-post-count').textContent = weekPosts.length;
   const target = parseInt(document.getElementById('weekly-target').value)||7;
-  document.getElementById('rpt-target-disp').textContent = target;
   const pct = Math.round(weekPosts.length/target*100);
-  document.getElementById('rpt-post-sub').innerHTML =
-    `目標: <span id="rpt-target-disp">${target}</span>投稿（${pct}%達成）`;
+  document.getElementById('rpt-post-count').textContent = weekPosts.length;
+  document.getElementById('rpt-post-sub').innerHTML = `目標${target}投稿（${pct}%達成）`;
 
-  // 連続投稿日数
+  // 連続日数（選択週末時点）
   let streak=0;
-  for(let i=0;i<30;i++){
-    const d=new Date(today); d.setDate(today.getDate()-i);
-    if(postedDays.has(d.toISOString().slice(0,10))) streak++;
+  const weekEnd = new Date(days[6]+'T12:00:00');
+  for(let i=0;i<60;i++){
+    const d=new Date(weekEnd); d.setDate(weekEnd.getDate()-i);
+    const ds=d.toISOString().slice(0,10);
+    if(ds > new Date().toISOString().slice(0,10)) continue;
+    if(postedDays.has(ds)) streak++;
     else break;
   }
   document.getElementById('rpt-streak').textContent = streak;
 
-  // バズり数（直近7日）
-  const latestFollowers = S.xOverall.length?S.xOverall[S.xOverall.length-1].followers:null;
+  // バズり数
   let buzzCount=0;
   weekPosts.forEach(p=>{
     const obs=latest(p.observations); if(!obs) return;
@@ -873,35 +945,63 @@ function renderReport(){
   });
   document.getElementById('rpt-buzz-count').textContent = buzzCount;
 
-  // インプ推移チャート（直近30日のポスト）
-  const days30=[];
-  for(let i=29;i>=0;i--){const d=new Date(today);d.setDate(today.getDate()-i);days30.push(d.toISOString().slice(0,10));}
-  const posts30 = S.xPosts
-    .filter(p=>days30.includes(p.postedAt))
-    .sort((a,b)=>a.postedAt.localeCompare(b.postedAt));
-
-  // 全インプの中央値を計算して停滞判定に使う
-  const allImps = posts30.map(p=>latest(p.observations)?.impressions||0).filter(v=>v>0);
+  // インプ推移バーチャート（この週の投稿）
+  const weekPostsSorted = weekPosts.slice().sort((a,b)=>a.postedAt.localeCompare(b.postedAt));
+  const allImps = weekPostsSorted.map(p=>latest(p.observations)?.impressions||0).filter(v=>v>0);
   const medImp  = allImps.length ? allImps.slice().sort((a,b)=>a-b)[Math.floor(allImps.length/2)] : 0;
-
-  const impData  = posts30.map(p=>latest(p.observations)?.impressions||0);
+  const impData  = weekPostsSorted.map(p=>latest(p.observations)?.impressions||0);
   const bgColors = impData.map(v=>{
     if(!medImp||v===0) return 'rgba(148,163,184,.4)';
     if(v >= medImp*0.8) return 'rgba(29,161,242,.75)';
     if(v >= medImp*0.4) return 'rgba(245,158,11,.75)';
     return 'rgba(239,68,68,.75)';
   });
-
   destroyChart('rptImp');
-  const ctx=document.getElementById('rpt-imp-chart').getContext('2d');
-  charts['rptImp']=new Chart(ctx,{type:'bar',data:{
-    labels:posts30.map(p=>p.postedAt.slice(5)),
-    datasets:[{label:'インプレッション',data:impData,backgroundColor:bgColors,borderRadius:5}]
-  },options:{...CD,responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false},
-      annotation:{annotations:{median:{type:'line',yMin:medImp,yMax:medImp,borderColor:'rgba(100,116,139,.5)',borderWidth:1,borderDash:[4,4]}}}
+  charts['rptImp']=new Chart(document.getElementById('rpt-imp-chart').getContext('2d'),{
+    type:'bar',data:{
+      labels:weekPostsSorted.map(p=>p.postedAt.slice(5)),
+      datasets:[{label:'インプ',data:impData,backgroundColor:bgColors,borderRadius:5}]
+    },options:{...CD,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
+  });
+
+  // 週比較折れ線グラフ
+  const weeksCount = parseInt(document.getElementById('rpt-weeks-count').value)||8;
+  const weekLabels=[], avgImps=[], postCounts=[], buzzCounts=[];
+  for(let w=-(weeksCount-1); w<=0; w++){
+    const wd = getWeekDays(w);
+    const st = getWeekStats(wd);
+    const wLabel = w===0?'今週':w===-1?'先週':`${Math.abs(w)}週前`;
+    weekLabels.push(wLabel);
+    avgImps.push(st.avgImp);
+    postCounts.push(st.posts);
+    buzzCounts.push(st.buzz);
+  }
+  destroyChart('rptWeekly');
+  charts['rptWeekly']=new Chart(document.getElementById('rpt-weekly-chart').getContext('2d'),{
+    type:'line',
+    data:{
+      labels:weekLabels,
+      datasets:[
+        {label:'週平均インプ',data:avgImps,borderColor:'#1DA1F2',backgroundColor:'rgba(29,161,242,.08)',fill:true,tension:.4,pointRadius:5,pointBackgroundColor:'#1DA1F2',yAxisID:'y'},
+        {label:'週投稿数',data:postCounts,borderColor:'#10b981',backgroundColor:'transparent',tension:.4,pointRadius:5,pointBackgroundColor:'#10b981',borderDash:[4,3],yAxisID:'y2'},
+        {label:'バズり数',data:buzzCounts,borderColor:'#f59e0b',backgroundColor:'transparent',tension:.4,pointRadius:5,pointBackgroundColor:'#f59e0b',borderDash:[2,2],yAxisID:'y2'},
+      ]
+    },
+    options:{...CD,responsive:true,maintainAspectRatio:false,
+      scales:{
+        x:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}}},
+        y:{grid:{color:'#f1f5f9'},ticks:{font:{size:11}},position:'left',title:{display:true,text:'平均インプ',font:{size:10}}},
+        y2:{grid:{drawOnChartArea:false},ticks:{font:{size:11},stepSize:1},position:'right',title:{display:true,text:'件数',font:{size:10}}},
+      },
+      plugins:{
+        legend:{labels:{font:{family:"'Noto Sans JP',sans-serif",size:11},boxWidth:12}},
+        // 選択中の週をハイライト
+        annotation:{annotations:{
+          currentWeek:{type:'box',xMin:weeksCount-1-Math.abs(offset)-.4,xMax:weeksCount-1-Math.abs(offset)+.4,backgroundColor:'rgba(29,161,242,.07)',borderColor:'rgba(29,161,242,.3)',borderWidth:1}
+        }}
+      }
     }
-  }});
+  });
 }
 
 // ── AI ウィークリーレポート ──
@@ -912,26 +1012,30 @@ async function generateReport(){
   box.className='ai-report-box loading';
   box.textContent='AIが分析中です...';
 
-  const today=new Date();
-  const days=[];
-  for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(today.getDate()-i);days.push(d.toISOString().slice(0,10));}
-
+  const offset = currentWeekOffset;
+  const days = getWeekDays(offset);
   const latestFollowers=S.xOverall.length?S.xOverall[S.xOverall.length-1].followers:null;
   const weekPosts=S.xPosts.filter(p=>days.includes(p.postedAt));
   const target=parseInt(document.getElementById('weekly-target').value)||7;
 
-  // 連続日数
   const postedDays=new Set(S.xPosts.map(p=>p.postedAt));
   let streak=0;
-  for(let i=0;i<30;i++){const d=new Date(today);d.setDate(today.getDate()-i);if(postedDays.has(d.toISOString().slice(0,10)))streak++;else break;}
+  const weekEnd=new Date(days[6]+'T12:00:00');
+  for(let i=0;i<60;i++){
+    const d=new Date(weekEnd);d.setDate(weekEnd.getDate()-i);
+    const ds=d.toISOString().slice(0,10);
+    if(ds>new Date().toISOString().slice(0,10)) continue;
+    if(postedDays.has(ds))streak++;else break;
+  }
 
-  // 直近30日のデータ
-  const days30=[];
-  for(let i=29;i>=0;i--){const d=new Date(today);d.setDate(today.getDate()-i);days30.push(d.toISOString().slice(0,10));}
-  const posts30=S.xPosts.filter(p=>days30.includes(p.postedAt)).sort((a,b)=>a.postedAt.localeCompare(b.postedAt));
-  const impTrend=posts30.map(p=>({date:p.postedAt,imp:latest(p.observations)?.impressions||0}));
+  // 直近8週のトレンド
+  const weeklyTrend=[];
+  for(let w=-7;w<=0;w++){
+    const wd=getWeekDays(w);
+    const st=getWeekStats(wd);
+    weeklyTrend.push({week:w===0?'今週':w===-1?'先週':`${Math.abs(w)}週前`,posts:st.posts,avgImp:st.avgImp,buzz:st.buzz});
+  }
 
-  // バズり判定サマリ
   const postSummary=weekPosts.map(p=>{
     const obs=latest(p.observations);
     const er=obs&&obs.impressions?(obs.engagements||0)/obs.impressions*100:null;
@@ -940,32 +1044,34 @@ async function generateReport(){
     return{content:p.content.slice(0,40),date:p.postedAt,imp:obs?.impressions||0,engRate:er?er.toFixed(1):null,reachRate:rr?rr.toFixed(1):null,judgment:sl?.l||'データなし'};
   });
 
+  const weekLabel = offset===0?'今週':offset===-1?'先週':`${Math.abs(offset)}週前`;
+
   const prompt=`あなたはXのインフルエンサー成長コーチです。以下のデータを分析して、日本語でウィークリーレポートを書いてください。
 
-【基本情報】
-- フォロワー数: ${latestFollowers||'不明'}人
-- 今週の投稿数: ${weekPosts.length}投稿（目標: ${target}投稿）
-- 連続投稿日数: ${streak}日
+【対象週】${weekLabel}（${days[0]} 〜 ${days[6]}）
+【フォロワー数】${latestFollowers||'不明'}人
+【この週の投稿数】${weekPosts.length}投稿（目標: ${target}投稿）
+【当週末時点の連続投稿日数】${streak}日
 
-【今週のポスト詳細】
-${postSummary.map(p=>`・${p.date} 「${p.content}...」 インプ:${p.imp} エンゲ率:${p.engRate||'?'}% リーチ率:${p.reachRate||'?'}% 判定:${p.judgment}`).join('\n')||'今週の投稿なし'}
+【この週のポスト詳細】
+${postSummary.map(p=>`・${p.date} 「${p.content}...」 インプ:${p.imp} エンゲ率:${p.engRate||'?'}% リーチ率:${p.reachRate||'?'}% 判定:${p.judgment}`).join('\n')||'投稿なし'}
 
-【直近30日インプ推移】
-${impTrend.map(t=>`${t.date}: ${t.imp}インプ`).join(', ')||'データなし'}
+【直近8週のトレンド（古い順）】
+${weeklyTrend.map(w=>`${w.week}: 投稿${w.posts}件 平均インプ${w.avgImp} バズり${w.buzz}件`).join('\n')}
 
 以下の形式で書いてください：
 
-【今週の総評】
+【${weekLabel}の総評】
 （2〜3文で全体評価）
 
 【投稿頻度】
-（目標達成状況と継続性のフィードバック）
+（目標達成状況と連続投稿のフィードバック）
 
 【コンテンツ品質】
 （バズり判定・エンゲージメントへのフィードバック）
 
-【インプ推移】
-（停滞・回復のパターン分析。4日以上の空白があればアルゴリズムへの影響を指摘）
+【週間トレンド分析】
+（8週の推移から見える傾向。インプが落ちた週があればアルゴリズムへの影響も言及）
 
 【来週のアクション】
 （具体的な改善アクションを3つ箇条書き）`;
@@ -974,11 +1080,7 @@ ${impTrend.map(t=>`${t.date}: ${t.imp}インプ`).join(', ')||'データなし'}
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
     const text=data.content?.find(b=>b.type==='text')?.text||'レポートの生成に失敗しました。';
