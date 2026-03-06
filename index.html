@@ -664,26 +664,47 @@ function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];
 function fmt(n){if(n==null||n==='') return '—'; return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
 function uid(){return Math.random().toString(36).slice(2,9);}
 function latest(obs){return obs.length?obs[obs.length-1]:null;}
-// reachRate = imp / followers * 100 (%)
-// engRate   = engagements / imp * 100 (%)
-// 判定基準（フォロワー数に関わらず相対評価）:
-//   リーチ率: 高≥30% 中≥10% 低<10%
-//   エンゲ率: 高≥5%  中≥2%  低<2%
-function scoreLabel(imp, engRate, reachRate){
+// ─────────────────────────────────────────────
+// 【判定閾値】ここを変えるだけで基準を調整できます
+// ─────────────────────────────────────────────
+const SCORE_TIERS = [
+  // { maxFollowers, reachHigh, reachMid }
+  // 例: 80FF → 500帯 → High=80% → 64インプが高リーチ閾値
+  { maxFollowers:   500, reachHigh: 80, reachMid: 50 },
+  { maxFollowers:  2000, reachHigh: 60, reachMid: 35 },
+  { maxFollowers: 10000, reachHigh: 40, reachMid: 20 },
+  { maxFollowers: Infinity, reachHigh: 20, reachMid: 10 },
+];
+// エンゲージメント率の閾値（全フォロワー帯共通）
+const ENG_BUZZ = 10; // % 以上 AND リーチ率High → 🔥 バズり
+const ENG_HIGH =  5; // % 以上で「高エンゲージ」
+const ENG_MID  =  2; // % 以上で「中エンゲージ」
+// ─────────────────────────────────────────────
+
+function scoreLabel(imp, engRate, reachRate, followers){
   if(imp==null) return null;
-  const rHigh = reachRate!=null && reachRate>=30;
-  const rMid  = reachRate!=null && reachRate>=10;
-  const eHigh = engRate!=null   && engRate>=5;
-  const eMid  = engRate!=null   && engRate>=2;
-  if(rHigh && eHigh) return{l:'🔥 バズり',   c:'badge-rose'};
-  if(rHigh && eMid)  return{l:'🚀 好調',      c:'badge-rose'};
-  if(rHigh)          return{l:'📡 高リーチ',  c:'badge-blue'};
-  if(rMid  && eHigh) return{l:'✨ 伸びてる',  c:'badge-green'};
-  if(rMid  && eMid)  return{l:'📈 順調',      c:'badge-green'};
-  if(rMid)           return{l:'👀 リーチ中',  c:'badge-blue'};
-  if(eHigh)          return{l:'💬 共感高め',  c:'badge-green'};
-  if(eMid)           return{l:'📊 普通',      c:'badge-amber'};
-  return              {l:'💤 低調',           c:'badge-amber'};
+
+  const ff = followers || 0;
+  const tier = SCORE_TIERS.find(t => ff <= t.maxFollowers) || SCORE_TIERS[SCORE_TIERS.length-1];
+
+  const rHigh = reachRate!=null && reachRate>=tier.reachHigh;
+  const rMid  = reachRate!=null && reachRate>=tier.reachMid;
+
+  const eBuzz = engRate!=null && engRate>=ENG_BUZZ;
+  const eHigh = engRate!=null && engRate>=ENG_HIGH;
+  const eMid  = engRate!=null && engRate>=ENG_MID;
+
+  if(rHigh && eBuzz) return{l:'🔥 バズり',    c:'badge-rose'};   // リーチ高 × エンゲ10%+
+  if(rHigh && eHigh) return{l:'🚀 好調',       c:'badge-rose'};   // リーチ高 × エンゲ5%+
+  if(rHigh && eMid)  return{l:'📡 高リーチ',   c:'badge-blue'};   // リーチ高 × エンゲ2%+
+  if(rHigh)          return{l:'👀 リーチのみ',  c:'badge-blue'};   // リーチ高 × エンゲ低
+  if(rMid  && eHigh) return{l:'✨ 伸びてる',   c:'badge-green'};  // リーチ中 × エンゲ5%+
+  if(rMid  && eMid)  return{l:'📈 順調',       c:'badge-green'};  // リーチ中 × エンゲ2%+
+  if(rMid)           return{l:'👀 リーチ中',   c:'badge-blue'};   // リーチ中 × エンゲ低
+  if(eBuzz)          return{l:'💬 超共感',     c:'badge-green'};  // リーチ低 × エンゲ10%+
+  if(eHigh)          return{l:'💬 共感高め',   c:'badge-green'};  // リーチ低 × エンゲ5%+
+  if(eMid)           return{l:'📊 普通',       c:'badge-amber'};
+  return              {l:'💤 低調',            c:'badge-amber'};
 }
 const CD={
   plugins:{legend:{labels:{font:{family:"'Noto Sans JP',sans-serif",size:11},boxWidth:12}}},
@@ -770,7 +791,7 @@ function renderXList(){
     const obs=latest(p.observations);
     const engRate=obs&&obs.impressions?(obs.engagements||0)/obs.impressions*100:null;
     const reachRate=obs&&obs.impressions&&latestFollowers?obs.impressions/latestFollowers*100:null;
-    const sl=obs?scoreLabel(obs.impressions,engRate,reachRate):null;
+    const sl=obs?scoreLabel(obs.impressions,engRate,reachRate,latestFollowers):null;
     const btn=document.createElement('button');
     btn.className='item-card'+(S.selectedX===p.id?' active-x':'');
     btn.innerHTML=`<div class="item-title" style="font-weight:400;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${p.content}</div>
@@ -799,7 +820,7 @@ function renderXDetail(){
   document.getElementById('x-sr').textContent=fmt(obs?.reposts);
   document.getElementById('x-sc').textContent=fmt(obs?.clicks);
   document.getElementById('x-sp').textContent=fmt(obs?.profileVisits);
-  const sl=obs?scoreLabel(obs.impressions,engRate,reachRate):null;
+  const sl=obs?scoreLabel(obs.impressions,engRate,reachRate,latestFollowers):null;
   document.getElementById('x-badge').innerHTML=sl?`<span class="badge ${sl.c}" style="white-space:nowrap">${sl.l}</span>`:'';
   destroyChart('xc');
   charts['xc']=new Chart(document.getElementById('x-chart').getContext('2d'),{type:'line',data:{
