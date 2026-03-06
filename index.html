@@ -284,6 +284,7 @@ textarea{resize:vertical}
               </div>
             </div>
             <div class="chart-sm"><canvas id="note-ov-chart"></canvas></div>
+            <table style="margin-top:12px"><thead><tr><th>月</th><th>フォロワー数</th><th></th></tr></thead><tbody id="n-ov-log"></tbody></table>
           </div>
         </div>
       </div>
@@ -369,6 +370,7 @@ textarea{resize:vertical}
               </div>
             </div>
             <div class="chart-sm"><canvas id="x-ov-chart"></canvas></div>
+            <table style="margin-top:12px"><thead><tr><th>月</th><th>フォロワー数</th><th></th></tr></thead><tbody id="x-ov-log"></tbody></table>
           </div>
         </div>
       </div>
@@ -404,6 +406,82 @@ textarea{resize:vertical}
       <button class="btn-danger" onclick="deleteXPost()">🗑 削除</button>
       <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-x')">キャンセル</button>
       <button class="btn-save x-save" onclick="saveXEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL (note obs) ══ -->
+<div id="modal-n-obs" class="modal-backdrop hidden" onclick="closeModal('modal-n-obs')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>📝 観測データを編集</h3>
+    <input type="hidden" id="edit-n-obs-idx" />
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label>観測日</label><input type="date" id="edit-n-obs-date" /></div>
+      <div class="fg fg2">
+        <div><label>ビュー数</label><input type="number" id="edit-n-obs-views" /></div>
+        <div><label>スキ数</label><input type="number" id="edit-n-obs-likes" /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-n-obs')">キャンセル</button>
+      <button class="btn-save" onclick="saveNoteObsEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL (x obs) ══ -->
+<div id="modal-x-obs" class="modal-backdrop hidden" onclick="closeModal('modal-x-obs')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>𝕏 観測データを編集</h3>
+    <input type="hidden" id="edit-x-obs-idx" />
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label>観測日</label><input type="date" id="edit-x-obs-date" /></div>
+      <div class="fg fg2">
+        <div><label>インプレッション</label><input type="number" id="edit-x-obs-imp" /></div>
+        <div><label>エンゲージメント数</label><input type="number" id="edit-x-obs-eng" /></div>
+        <div><label>いいね</label><input type="number" id="edit-x-obs-likes" /></div>
+        <div><label>リポスト</label><input type="number" id="edit-x-obs-rt" /></div>
+        <div><label>詳細クリック</label><input type="number" id="edit-x-obs-cl" /></div>
+        <div><label>プロフィールアクセス</label><input type="number" id="edit-x-obs-pv" /></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-x-obs')">キャンセル</button>
+      <button class="btn-save x-save" onclick="saveXObsEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL (note overall) ══ -->
+<div id="modal-n-ov" class="modal-backdrop hidden" onclick="closeModal('modal-n-ov')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>📝 フォロワー数を編集</h3>
+    <input type="hidden" id="edit-n-ov-idx" />
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label>月 (YYYY-MM)</label><input type="text" id="edit-n-ov-date" /></div>
+      <div><label>フォロワー数</label><input type="number" id="edit-n-ov-followers" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="deleteNoteOverall()">🗑 削除</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-n-ov')">キャンセル</button>
+      <button class="btn-save" onclick="saveNoteOverallEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL (x overall) ══ -->
+<div id="modal-x-ov" class="modal-backdrop hidden" onclick="closeModal('modal-x-ov')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>𝕏 フォロワー数を編集</h3>
+    <input type="hidden" id="edit-x-ov-idx" />
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div><label>月 (YYYY-MM)</label><input type="text" id="edit-x-ov-date" /></div>
+      <div><label>フォロワー数</label><input type="number" id="edit-x-ov-followers" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="deleteXOverall()">🗑 削除</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-x-ov')">キャンセル</button>
+      <button class="btn-save x-save" onclick="saveXOverallEdit()">保存</button>
     </div>
   </div>
 </div>
@@ -661,7 +739,10 @@ function renderNoteDetail(){
     const i=a.observations.length-1-ri;
     return`<tr><td>${o.date}</td><td class="td-b">${fmt(o.views)}</td><td class="td-n">${fmt(o.likes)}</td>
     <td>${o.views?((o.likes/o.views)*100).toFixed(1)+'%':'—'}</td>
-    <td><button class="del-obs" onclick="deleteNoteObs(${i})" title="削除">×</button></td></tr>`;
+    <td style="white-space:nowrap">
+      <button class="del-obs" onclick="openNoteObsEdit(${i})" title="編集" style="margin-right:2px">✏️</button>
+      <button class="del-obs" onclick="deleteNoteObs(${i})" title="削除">×</button>
+    </td></tr>`;
   }).join('');
 }
 function renderNoteOverall(){
@@ -670,6 +751,14 @@ function renderNoteOverall(){
     labels:S.noteOverall.map(o=>o.date),
     datasets:[{label:'フォロワー',data:S.noteOverall.map(o=>o.followers),borderColor:'#41C9A0',backgroundColor:'rgba(65,201,160,.1)',fill:true,tension:.4,pointRadius:6,pointBackgroundColor:'#41C9A0'}]
   },options:{...CD,responsive:true,maintainAspectRatio:false}});
+  document.getElementById('n-ov-log').innerHTML=[...S.noteOverall].reverse().map((o,ri)=>{
+    const i=S.noteOverall.length-1-ri;
+    return`<tr><td>${o.date}</td><td class="td-b">${o.followers.toLocaleString()}</td>
+    <td style="white-space:nowrap">
+      <button class="del-obs" onclick="openNoteOverallEdit(${i})" title="編集" style="margin-right:2px">✏️</button>
+      <button class="del-obs" onclick="deleteNoteOverall(${i})" title="削除">×</button>
+    </td></tr>`;
+  }).join('');
 }
 function renderNote(){renderNoteList();renderNoteDetail();renderNoteOverall();}
 
@@ -741,7 +830,10 @@ function renderXDetail(){
       <td>${fmt(o.reposts)}</td>
       <td>${fmt(o.clicks)}</td>
       <td>${fmt(o.profileVisits)}</td>
-      <td><button class="del-obs" onclick="deleteXObs(${i})" title="削除">×</button></td>
+      <td style="white-space:nowrap">
+        <button class="del-obs" onclick="openXObsEdit(${i})" title="編集" style="margin-right:2px">✏️</button>
+        <button class="del-obs" onclick="deleteXObs(${i})" title="削除">×</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -751,6 +843,14 @@ function renderXOverall(){
     labels:S.xOverall.map(o=>o.date),
     datasets:[{label:'フォロワー',data:S.xOverall.map(o=>o.followers),borderColor:'#1DA1F2',backgroundColor:'rgba(29,161,242,.1)',fill:true,tension:.4,pointRadius:6,pointBackgroundColor:'#1DA1F2'}]
   },options:{...CD,responsive:true,maintainAspectRatio:false}});
+  document.getElementById('x-ov-log').innerHTML=[...S.xOverall].reverse().map((o,ri)=>{
+    const i=S.xOverall.length-1-ri;
+    return`<tr><td>${o.date}</td><td class="td-b">${o.followers.toLocaleString()}</td>
+    <td style="white-space:nowrap">
+      <button class="del-obs" onclick="openXOverallEdit(${i})" title="編集" style="margin-right:2px">✏️</button>
+      <button class="del-obs" onclick="deleteXOverall(${i})" title="削除">×</button>
+    </td></tr>`;
+  }).join('');
 }
 function renderX(){renderXList();renderXDetail();renderXOverall();}
 function renderAll(){renderNote();renderX();}
@@ -787,6 +887,48 @@ function deleteNoteObs(i){
   a.observations.splice(i,1);
   renderNote(); scheduleSave();
 }
+function openNoteObsEdit(i){
+  const a=S.noteArticles.find(x=>x.id===S.selectedNote);if(!a) return;
+  const o=a.observations[i];
+  document.getElementById('edit-n-obs-idx').value=i;
+  document.getElementById('edit-n-obs-date').value=o.date;
+  document.getElementById('edit-n-obs-views').value=o.views||'';
+  document.getElementById('edit-n-obs-likes').value=o.likes||'';
+  openModal('modal-n-obs');
+}
+function saveNoteObsEdit(){
+  const i=parseInt(document.getElementById('edit-n-obs-idx').value);
+  const date=document.getElementById('edit-n-obs-date').value;
+  const views=parseInt(document.getElementById('edit-n-obs-views').value)||0;
+  const likes=parseInt(document.getElementById('edit-n-obs-likes').value)||0;
+  if(!date||!views){alert('観測日とビュー数を入力してください');return;}
+  const a=S.noteArticles.find(x=>x.id===S.selectedNote);
+  a.observations[i]={date,views,likes};
+  a.observations.sort((a,b)=>a.date.localeCompare(b.date));
+  closeModal('modal-n-obs'); renderNote(); scheduleSave();
+}
+function openNoteOverallEdit(i){
+  const o=S.noteOverall[i];
+  document.getElementById('edit-n-ov-idx').value=i;
+  document.getElementById('edit-n-ov-date').value=o.date;
+  document.getElementById('edit-n-ov-followers').value=o.followers;
+  openModal('modal-n-ov');
+}
+function saveNoteOverallEdit(){
+  const i=parseInt(document.getElementById('edit-n-ov-idx').value);
+  const date=document.getElementById('edit-n-ov-date').value.trim();
+  const followers=parseInt(document.getElementById('edit-n-ov-followers').value)||0;
+  if(!date||!followers){alert('月とフォロワー数を入力してください');return;}
+  S.noteOverall[i]={date,followers};
+  S.noteOverall.sort((a,b)=>a.date.localeCompare(b.date));
+  closeModal('modal-n-ov'); renderNote(); scheduleSave();
+}
+function deleteNoteOverall(i){
+  if(i===undefined) i=parseInt(document.getElementById('edit-n-ov-idx').value);
+  if(!confirm('このフォロワーデータを削除しますか？')) return;
+  S.noteOverall.splice(i,1);
+  closeModal('modal-n-ov'); renderNote(); scheduleSave();
+}
 
 function openXEdit(){
   const p=S.xPosts.find(x=>x.id===S.selectedX);if(!p) return;
@@ -816,6 +958,58 @@ function deleteXObs(i){
   const p=S.xPosts.find(x=>x.id===S.selectedX);if(!p) return;
   p.observations.splice(i,1);
   renderX(); scheduleSave();
+}
+function openXObsEdit(i){
+  const p=S.xPosts.find(x=>x.id===S.selectedX);if(!p) return;
+  const o=p.observations[i];
+  document.getElementById('edit-x-obs-idx').value=i;
+  document.getElementById('edit-x-obs-date').value=o.date;
+  document.getElementById('edit-x-obs-imp').value=o.impressions||'';
+  document.getElementById('edit-x-obs-eng').value=o.engagements||'';
+  document.getElementById('edit-x-obs-likes').value=o.likes||'';
+  document.getElementById('edit-x-obs-rt').value=o.reposts||'';
+  document.getElementById('edit-x-obs-cl').value=o.clicks||'';
+  document.getElementById('edit-x-obs-pv').value=o.profileVisits||'';
+  openModal('modal-x-obs');
+}
+function saveXObsEdit(){
+  const i=parseInt(document.getElementById('edit-x-obs-idx').value);
+  const date=document.getElementById('edit-x-obs-date').value;
+  const impressions=parseInt(document.getElementById('edit-x-obs-imp').value)||0;
+  if(!date||!impressions){alert('観測日とインプレッション数を入力してください');return;}
+  const p=S.xPosts.find(x=>x.id===S.selectedX);
+  p.observations[i]={
+    date, impressions,
+    engagements:parseInt(document.getElementById('edit-x-obs-eng').value)||0,
+    likes:parseInt(document.getElementById('edit-x-obs-likes').value)||0,
+    reposts:parseInt(document.getElementById('edit-x-obs-rt').value)||0,
+    clicks:parseInt(document.getElementById('edit-x-obs-cl').value)||0,
+    profileVisits:parseInt(document.getElementById('edit-x-obs-pv').value)||0,
+  };
+  p.observations.sort((a,b)=>a.date.localeCompare(b.date));
+  closeModal('modal-x-obs'); renderX(); scheduleSave();
+}
+function openXOverallEdit(i){
+  const o=S.xOverall[i];
+  document.getElementById('edit-x-ov-idx').value=i;
+  document.getElementById('edit-x-ov-date').value=o.date;
+  document.getElementById('edit-x-ov-followers').value=o.followers;
+  openModal('modal-x-ov');
+}
+function saveXOverallEdit(){
+  const i=parseInt(document.getElementById('edit-x-ov-idx').value);
+  const date=document.getElementById('edit-x-ov-date').value.trim();
+  const followers=parseInt(document.getElementById('edit-x-ov-followers').value)||0;
+  if(!date||!followers){alert('月とフォロワー数を入力してください');return;}
+  S.xOverall[i]={date,followers};
+  S.xOverall.sort((a,b)=>a.date.localeCompare(b.date));
+  closeModal('modal-x-ov'); renderX(); scheduleSave();
+}
+function deleteXOverall(i){
+  if(i===undefined) i=parseInt(document.getElementById('edit-x-ov-idx').value);
+  if(!confirm('このフォロワーデータを削除しますか？')) return;
+  S.xOverall.splice(i,1);
+  closeModal('modal-x-ov'); renderX(); scheduleSave();
 }
 
 // ════════════════ MUTATIONS ════════════════
