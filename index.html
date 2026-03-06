@@ -249,7 +249,13 @@ textarea{resize:vertical}
         <div class="sidebar">
           <div class="sidebar-hd">
             <span class="sidebar-title">記事一覧</span>
-            <button class="btn btn-note btn-sm" onclick="toggleForm('n-add-art')">＋追加</button>
+            <div style="display:flex;align-items:center;gap:5px">
+              <select id="n-sort" onchange="renderNoteList()" style="font-size:11px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-family:inherit;background:#f8fafc;color:var(--sm)">
+                <option value="date-desc">新しい順</option>
+                <option value="date-asc">古い順</option>
+              </select>
+              <button class="btn btn-note btn-sm" onclick="toggleForm('n-add-art')">＋追加</button>
+            </div>
           </div>
           <div id="n-add-art" class="form-panel nb hidden">
             <p class="form-title">新しい記事</p>
@@ -323,7 +329,13 @@ textarea{resize:vertical}
         <div class="sidebar" style="width:268px">
           <div class="sidebar-hd">
             <span class="sidebar-title">ポスト一覧</span>
-            <button class="btn btn-x btn-sm" onclick="toggleForm('x-add-post')">＋追加</button>
+            <div style="display:flex;align-items:center;gap:5px">
+              <select id="x-sort" onchange="renderXList()" style="font-size:11px;border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-family:inherit;background:#f8fafc;color:var(--sm)">
+                <option value="date-desc">新しい順</option>
+                <option value="date-asc">古い順</option>
+              </select>
+              <button class="btn btn-x btn-sm" onclick="toggleForm('x-add-post')">＋追加</button>
+            </div>
           </div>
           <div id="x-add-post" class="form-panel xb hidden">
             <p class="form-title">新しいポスト</p>
@@ -1094,7 +1106,12 @@ ${weeklyTrend.map(w=>`${w.week}: 投稿${w.posts}件 平均インプ${w.avgImp} 
 }
 function renderNoteList(){
   const el=document.getElementById('note-list');el.innerHTML='';
-  S.noteArticles.forEach(a=>{
+  const sort=document.getElementById('n-sort')?.value||'date-desc';
+  const articles=[...S.noteArticles].sort((a,b)=>{
+    const cmp=a.publishedAt.localeCompare(b.publishedAt);
+    return sort==='date-asc'?cmp:-cmp;
+  });
+  articles.forEach(a=>{
     const obs=latest(a.observations);
     const btn=document.createElement('button');
     btn.className='item-card'+(S.selectedNote===a.id?' active-note':'');
@@ -1152,7 +1169,12 @@ function renderNote(){renderNoteList();renderNoteDetail();renderNoteOverall();}
 function renderXList(){
   const el=document.getElementById('x-list');el.innerHTML='';
   const latestFollowers=S.xOverall.length?S.xOverall[S.xOverall.length-1].followers:null;
-  S.xPosts.forEach(p=>{
+  const sort=document.getElementById('x-sort')?.value||'date-desc';
+  const posts=[...S.xPosts].sort((a,b)=>{
+    const cmp=a.postedAt.localeCompare(b.postedAt);
+    return sort==='date-asc'?cmp:-cmp;
+  });
+  posts.forEach(p=>{
     const obs=latest(p.observations);
     const engRate=obs&&obs.impressions?(obs.engagements||0)/obs.impressions*100:null;
     const reachRate=obs&&obs.impressions&&latestFollowers?obs.impressions/latestFollowers*100:null;
